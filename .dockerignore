@@ -1,0 +1,26 @@
+# Control de versiones
+.git
+.gitignore
+
+# Variables de entorno (nunca al contenedor)
+.env
+
+# Índice vectorial generado (se regenera en el contenedor)
+src/chroma_db/
+src/file_hashes.json
+
+# Caché de Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDEs y sistema operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docker (no necesario dentro de la imagen)
+Dockerfile
+docker-compose.yml
+.dockerignore

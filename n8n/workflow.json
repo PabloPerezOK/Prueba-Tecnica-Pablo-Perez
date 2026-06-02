@@ -1,0 +1,136 @@
+{
+  "name": "Asistente de Soporte Técnico",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "soporte",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook — Recibir Pregunta",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "soporte-tech"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\n\nconst question = (body?.question || '').trim();\n\nif (!question) {\n  return [{ json: { error: true, message: 'La pregunta no puede estar vacía.' } }];\n}\n\nreturn [{ json: { question, valid: true } }];"
+      },
+      "id": "validate-input",
+      "name": "Validar Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "check-valid",
+      "name": "¿Input válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/ask",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-API-Key", "value": "={{ $env.PYTHON_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [{ "name": "question", "value": "={{ $json.question }}" }]
+        },
+        "options": {
+          "timeout": 65000,
+          "ignoreResponseCode": true
+        }
+      },
+      "id": "call-python-api",
+      "name": "Llamar API Python",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const res = $input.first().json;\n\nif (res.error || !res.answer) {\n  return [{\n    json: {\n      success: false,\n      answer: res.detail || 'Ocurrió un error al procesar tu consulta. Por favor intentá más tarde.',\n      sources: [],\n      chunks_used: 0\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    success: true,\n    answer: res.answer,\n    sources: res.sources,\n    chunks_used: res.chunks_used\n  }\n}];"
+      },
+      "id": "process-response",
+      "name": "Procesar Respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "respond-success",
+      "name": "Responder — OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1300, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, answer: $json.message }) }}",
+        "options": { "responseCode": 400 }
+      },
+      "id": "respond-error",
+      "name": "Responder — Error 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [860, 420]
+    }
+  ],
+  "connections": {
+    "Webhook — Recibir Pregunta": {
+      "main": [[{ "node": "Validar Input", "type": "main", "index": 0 }]]
+    },
+    "Validar Input": {
+      "main": [[{ "node": "¿Input válido?", "type": "main", "index": 0 }]]
+    },
+    "¿Input válido?": {
+      "main": [
+        [{ "node": "Llamar API Python", "type": "main", "index": 0 }],
+        [{ "node": "Responder — Error 400", "type": "main", "index": 0 }]
+      ]
+    },
+    "Llamar API Python": {
+      "main": [[{ "node": "Procesar Respuesta", "type": "main", "index": 0 }]]
+    },
+    "Procesar Respuesta": {
+      "main": [[{ "node": "Responder — OK", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "instanceId": "prueba-tecnica-unilink"
+  }
+}

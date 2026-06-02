@@ -1,0 +1,10 @@
+# Normalización de saltos de línea
+* text=auto
+
+# Scripts de shell y archivos que ejecuta Linux/Docker SIEMPRE con LF.
+# Evita el error "/bin/sh^M: bad interpreter" al clonar el repo en Windows
+# (donde Git, por defecto, convertiría los saltos de línea a CRLF).
+*.sh        text eol=lf
+entrypoint.sh text eol=lf
+Dockerfile  text eol=lf
+docker-compose.yml text eol=lf

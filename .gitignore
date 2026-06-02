@@ -1,0 +1,31 @@
+# Variables de entorno
+.env
+
+# Índice vectorial generado por ingest.py
+src/chroma_db/
+
+# Hashes de archivos (se regeneran automáticamente)
+src/file_hashes.json
+
+# Caché de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Logs generados por las suites de test
+resultados_*.txt

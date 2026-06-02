@@ -1,0 +1,104 @@
+services:
+
+  # ── 1. Servidor LLM local ─────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  # ── 2. Descarga de modelos (se ejecuta una sola vez) ──────────────────────
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: ollama-init
+    depends_on:
+      ollama:
+        condition: service_started
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # FIX: reemplaza el sleep 5 fijo por un loop de polling.
+        # En hardware lento o en el primer boot Ollama puede tardar más de 5s,
+        # lo que hacía fallar silenciosamente el pull de modelos.
+        echo "Esperando a que Ollama esté disponible..."
+        until ollama list > /dev/null 2>&1; do
+          echo "  Ollama aún no responde, reintentando en 3s..."
+          sleep 3
+        done
+        echo "Ollama listo."
+        echo "Descargando nomic-embed-text (~274 MB)..."
+        ollama pull nomic-embed-text
+        echo "Descargando llama3.2 (~2 GB)..."
+        ollama pull llama3.2
+        echo "Modelos listos."
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    networks:
+      - app_network
+
+  # ── 3. API Python (FastAPI) ───────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+    volumes:
+      - ./docs:/app/docs:ro
+      - chroma_data:/app/src/chroma_db
+    depends_on:
+      ollama-init:
+        condition: service_completed_successfully
+    # FIX: healthcheck usando el endpoint /health que ya existía pero no se
+    # usaba. start_period de 120s cubre el tiempo de ingest.py en el arranque.
+    # n8n usaba depends_on sin condición y podía arrancar antes de que
+    # FastAPI terminara de indexar, devolviendo 502 en los primeros minutos.
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  # ── 4. n8n ────────────────────────────────────────────────────────────────
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - PYTHON_API_KEY=${API_KEY}
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+    volumes:
+      - n8n_data:/home/node/.n8n
+    # FIX: condition: service_healthy garantiza que n8n no arranque hasta que
+    # FastAPI esté respondiendo /health correctamente.
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app_network
+
+
+volumes:
+  ollama_data:
+  chroma_data:
+  n8n_data:
+
+networks:
+  app_network:
+    driver: bridge
