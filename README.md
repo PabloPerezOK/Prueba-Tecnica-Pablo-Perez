@@ -46,8 +46,8 @@ docker-compose
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/<tu-usuario>/<tu-repo>.git
-cd <tu-repo>
+git clone https://github.com/PabloPerezOK/Prueba-Tecnica-Pablo-Perez.git
+cd Prueba-Tecnica-Pablo-Perez
 ```
 
 ### 2. Configurar variables de entorno
